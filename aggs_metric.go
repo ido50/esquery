@@ -6,6 +6,7 @@ import "github.com/fatih/structs"
 type BaseAgg struct {
 	name           string
 	apiName        string
+	aggs           []Aggregation
 	*BaseAggParams `structs:",flatten"`
 }
 
@@ -13,10 +14,12 @@ type BaseAgg struct {
 // types.
 type BaseAggParams struct {
 	// Field is the name of the field to aggregate on.
-	Field string `structs:"field"`
+	Field string `structs:"field,omitempty"`
 	// Miss is a value to provide for documents that are missing a value for the
 	// field.
 	Miss interface{} `structs:"missing,omitempty"`
+
+	Source Source `structs:"_source,omitempty"`
 }
 
 func newBaseAgg(apiName, name, field string) *BaseAgg {
@@ -393,5 +396,74 @@ func (agg *StringStatsAgg) ShowDistribution(b bool) *StringStatsAgg {
 func (agg *StringStatsAgg) Map() map[string]interface{} {
 	return map[string]interface{}{
 		agg.apiName: structs.Map(agg),
+	}
+}
+
+// ---------------------------------------------------------------------------//
+
+// TopHitsAgg represents an aggregation of type "top_hits", as described
+// in https://www.elastic.co/guide/en/elasticsearch/reference/
+//     current/search-aggregations-metrics-top-hits-aggregation.html
+type TopHitsAgg struct {
+	name   string
+	from   uint64
+	size   uint64
+	sort   []map[string]interface{}
+	source Source
+}
+
+func TopHits(name string) *TopHitsAgg {
+	return &TopHitsAgg{
+		name: name,
+	}
+}
+
+func (agg *TopHitsAgg) Name() string {
+	return agg.name
+}
+
+func (agg *TopHitsAgg) From(offset uint64) *TopHitsAgg {
+	agg.from = offset
+	return agg
+}
+
+func (agg *TopHitsAgg) Size(size uint64) *TopHitsAgg {
+	agg.size = size
+	return agg
+}
+
+func (agg *TopHitsAgg) Sort(name string, order Order) *TopHitsAgg {
+	agg.sort = append(agg.sort, map[string]interface{}{
+		name: map[string]interface{}{
+			"order": order,
+		},
+	})
+
+	return agg
+}
+
+func (agg *TopHitsAgg) SourceIncludes(keys ...string) *TopHitsAgg {
+	agg.source.includes = keys
+	return agg
+}
+
+func (agg *TopHitsAgg) Map() map[string]interface{} {
+	innerMap := make(map[string]interface{})
+
+	if agg.from > 0 {
+		innerMap["from"] = agg.from
+	}
+	if agg.size > 0 {
+		innerMap["size"] = agg.size
+	}
+	if len(agg.sort) > 0 {
+		innerMap["sort"] = agg.sort
+	}
+	if len(agg.source.includes) > 0 {
+		innerMap["_source"] = agg.source.Map()
+	}
+
+	return map[string]interface{}{
+		"top_hits": innerMap,
 	}
 }
