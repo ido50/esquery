@@ -12,6 +12,8 @@ type TermsAggregation struct {
 	shardSize   *float64
 	showTermDoc *bool
 	aggs        []Aggregation
+	sort        []map[string]interface{}
+	source      Source
 }
 
 // TermsAgg creates a new aggregation of type "terms". The method name includes
@@ -54,6 +56,24 @@ func (agg *TermsAggregation) Aggs(aggs ...Aggregation) *TermsAggregation {
 	return agg
 }
 
+// Sort sets how the top matching hits should be sorted. By default the hits are
+// sorted by the score of the main query.
+func (agg *TermsAggregation) Sort(name string, order Order) *TermsAggregation {
+	agg.sort = append(agg.sort, map[string]interface{}{
+		name: map[string]interface{}{
+			"order": order,
+		},
+	})
+
+	return agg
+}
+
+// SourceIncludes sets the keys to return from the top matching documents.
+func (agg *TermsAggregation) SourceIncludes(keys ...string) *TermsAggregation {
+	agg.source.includes = keys
+	return agg
+}
+
 // Map returns a map representation of the aggregation, thus implementing the
 // Mappable interface.
 func (agg *TermsAggregation) Map() map[string]interface{} {
@@ -69,6 +89,12 @@ func (agg *TermsAggregation) Map() map[string]interface{} {
 	}
 	if agg.showTermDoc != nil {
 		innerMap["show_term_doc_count_error"] = *agg.showTermDoc
+	}
+	if len(agg.sort) > 0 {
+		innerMap["sort"] = agg.sort
+	}
+	if len(agg.source.includes) > 0 {
+		innerMap["_source"] = agg.source.Map()
 	}
 
 	outerMap := map[string]interface{}{
